@@ -13,6 +13,9 @@ When you save the notebook, an HTML file containing the code and output will be 
 
 Let's start
 
+https://campus.datacamp.com/courses/kaggle-r-tutorial-on-machine-learning/chapter-1-raising-anchor?ex=1
+
+
 Import library
 
 ```{r}
