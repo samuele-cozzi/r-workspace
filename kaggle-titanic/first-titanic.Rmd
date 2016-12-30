@@ -1,0 +1,177 @@
+---
+title: "R first notebook - Titanic Kaggle"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+Let's start
+
+Import library
+
+```{r}
+library(ggplot2) # Data visualization
+library(readr) # CSV file I/O, e.g. the read_csv function
+
+library(rpart) #decision tree
+library(rattle)
+library(rpart.plot)
+library(RColorBrewer)
+
+```
+
+```{r}
+library(randomForest)
+```
+
+
+Import data
+
+```{r}
+#Import the training set: train
+train_url <- "http://s3.amazonaws.com/assets.datacamp.com/course/Kaggle/train.csv"
+train <- read.csv(train_url)
+
+#Import the testing set: test
+test_url <- "http://s3.amazonaws.com/assets.datacamp.com/course/Kaggle/test.csv"
+test <- read.csv(test_url)
+
+#visualize data sets
+str(train)
+str(test)
+```
+
+Analayze data
+
+Male vs Female
+```{r}
+# Survival rates in absolute numbers
+table(train$Survived)
+
+# Survival rates in proportions
+prop.table(table(train$Survived))
+  
+# Two-way comparison: Sex and Survived
+table(train$Sex, train$Survived)
+
+# Two-way comparison: row-wise proportions
+prop.table(table(train$Sex, train$Survived),1)
+```
+
+```{r}
+# Create the column child, and indicate whether child or no child
+train$Child <- NA
+train$Child[train$Age < 18] <- 1
+train$Child[train$Age >= 18] <- 0
+
+# Two-way comparison
+prop.table(table(train$Child, train$Survived),1)
+```
+
+First prediction
+
+```{r}
+# Copy of test
+test_one <- test
+
+# Initialize a Survived column to 0
+test_one$Survived <- 0
+
+# Set Survived to 1 if Sex equals "female"
+test_one$Survived[test_one$Sex == 'female'] <- 1
+
+
+```
+
+Second prediction: tree
+
+```{r}
+my_tree_two <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked, data = train, method = "class")
+
+# Visualize the decision tree using plot() and text()
+plot(my_tree_two)
+text(my_tree_two)
+
+# Time to plot your fancy tree
+fancyRpartPlot(my_tree_two)
+
+#prediction
+my_prediction <- predict(my_tree_two, newdata = test, type = "class")
+
+# Finish the data.frame() call
+my_solution <- data.frame(PassengerId = test$PassengerId, Survived = my_prediction)
+
+# Use nrow() on my_solution
+nrow(my_solution)
+
+# Finish the write.csv() call
+write.csv(my_solution, file = "my_solution.csv", row.names = FALSE)
+```
+
+  Third prediction:
+  
+  
+  
+```{r}
+# Change this command
+my_tree_three <- rpart(Survived ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked,
+                     data = train, method = "class", control = rpart.control(minsplit = 50, cp = 0))
+
+# Visualize my_tree_three
+fancyRpartPlot(my_tree_three)
+```
+
+
+Prediction: Random Forest
+
+```{r}
+str(train)
+str(test)
+```
+
+```{r}
+# Passenger on row 62 and 830 do not have a value for embarkment.
+# Since many passengers embarked at Southampton, we give them the value S.
+train$Embarked[c(62, 830)] <- "S"
+
+# Factorize embarkment codes.
+train$Embarked <- factor(train$Embarked)
+
+# Passenger on row 1044 has an NA Fare value. Let's replace it with the median fare value.
+train$Fare[891] <- median(train$Fare, na.rm = TRUE)
+
+# How to fill in missing Age values?
+# We make a prediction of a passengers Age using the other variables and a decision tree model.
+# This time you give method = "anova" since you are predicting a continuous variable.
+library(rpart)
+predicted_age <- rpart(Age ~ Pclass + Sex + SibSp + Parch + Fare + Embarked,
+                       data = train[!is.na(train$Age),], method = "anova")
+train$Age[is.na(train$Age)] <- predict(predicted_age, train[is.na(train$Age),])
+```
+
+
+
+```{r}
+# Set seed for reproducibility
+set.seed(111)
+
+# Apply the Random Forest Algorithm
+my_forest <- randomForest(as.factor(Survived) ~ Pclass + Sex + Age + SibSp + Parch + Fare + Embarked, data = train,importance=TRUE, ntree=1000)
+
+# Make your prediction using the test set
+my_prediction <- predict(my_forest, test)
+
+# Create a data frame with two columns: PassengerId & Survived. Survived contains your predictions
+my_solution <- data.frame(PassengerId = test$PassengerId, Survived = my_prediction)
+
+# Write your solution away to a csv file with the name my_solution.csv
+write.csv(my_solution, file = "my_solution_random.csv", row.names = FALSE)
+```
+
+
